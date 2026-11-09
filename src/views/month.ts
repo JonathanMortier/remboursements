@@ -1,11 +1,9 @@
 import { api, type Expense } from '../api';
 import { dateLabel, formatEuro, h, monthLabel, shiftMonth, toast } from '../dom';
 import { flush, pending, removePending } from '../queue';
+import { renderForm } from './form';
 
 type Row = Expense & { pending?: boolean };
-
-/** Dépense sélectionnée pour l'écran de modification. */
-export let editTarget: Expense | null = null;
 
 export async function renderMonth(root: HTMLElement, month: string): Promise<void> {
   const body = h('div', { class: 'month-body' });
@@ -120,6 +118,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
                   'div',
                   { class: 'right' },
                   h('strong', null, formatEuro(x.amount)),
+                  x.secu ? h('span', { class: 'badge secu' }, 'Sécu') : null,
                   x.pending
                     ? h('span', { class: 'badge warn' }, 'en attente')
                     : x.paidAt
@@ -148,6 +147,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         h('dd', null, dateLabel(x.date)),
         h('dt', null, 'Catégorie'),
         h('dd', null, x.category),
+        x.secu !== undefined ? [h('dt', null, 'Sécu'), h('dd', null, x.secu ? 'Remboursé' : 'Non remboursé')] : null,
         x.store ? [h('dt', null, 'Magasin'), h('dd', null, x.store)] : null,
         x.note ? [h('dt', null, 'Note'), h('dd', null, x.note)] : null,
         x.by ? [h('dt', null, 'Saisi par'), h('dd', null, x.by)] : null,
@@ -186,9 +186,8 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
               'button',
               {
                 onclick: () => {
-                  editTarget = x;
                   dialog.close();
-                  location.hash = '#/edit/' + x.id;
+                  openEdit(x);
                 },
               },
               'Modifier',
@@ -215,6 +214,23 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         ),
         h('button', { onclick: () => dialog.close() }, 'Fermer'),
       ),
+    );
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+
+  /** Formulaire de modification dans une popin, avec bouton Annuler. */
+  function openEdit(x: Expense) {
+    const content = h('div');
+    const dialog: HTMLDialogElement = h('dialog', { class: 'detail edit', onclose: () => dialog.remove() }, content);
+    renderForm(
+      content,
+      x,
+      () => {
+        dialog.close();
+        load(true);
+      },
+      () => dialog.close(),
     );
     document.body.append(dialog);
     dialog.showModal();

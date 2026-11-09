@@ -3,7 +3,7 @@ import { currentMonth, h, toast } from './dom';
 import { flush, onQueueChange, pending } from './queue';
 import { applyScriptParam, isConfigured } from './settings';
 import { renderForm } from './views/form';
-import { editTarget, renderMonth } from './views/month';
+import { renderMonth } from './views/month';
 import { renderSettings } from './views/settings';
 import './style.css';
 
@@ -31,18 +31,12 @@ function route() {
     location.hash = '#/settings';
     return;
   }
-  Object.entries(tabs).forEach(([k, el]) => el.classList.toggle('active', k === page || (page === 'edit' && k === 'month')));
+  Object.entries(tabs).forEach(([k, el]) => el.classList.toggle('active', k === page));
   window.scrollTo(0, 0);
 
   switch (page) {
     case 'month':
       renderMonth(main, arg && /^\d{4}-\d{2}$/.test(arg) ? arg : currentMonth());
-      break;
-    case 'edit':
-      if (editTarget && editTarget.id === arg) {
-        const month = editTarget.date.slice(0, 7);
-        renderForm(main, editTarget, (e) => (location.hash = '#/month/' + (e.date.slice(0, 7) || month)));
-      } else location.hash = '#/month';
       break;
     case 'settings':
       renderSettings(main);

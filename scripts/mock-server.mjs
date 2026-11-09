@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
 const SECRET = 'test';
-const categories = ['Courses', 'Pharmacie / Santé', 'Enfants', 'Maison', 'Restaurant', 'Autre'];
+const categories = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
 const expenses = [];
 const photos = new Map();
 

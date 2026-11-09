@@ -12,9 +12,9 @@
 
 var SHEET_EXPENSES = 'Dépenses';
 var SHEET_CATEGORIES = 'Catégories';
-var HEADERS = ['id', 'date', 'montant', 'catégorie', 'magasin', 'note', 'photo_id', 'saisi_par', 'créé_le', 'remboursé_le'];
-var COL = { id: 0, date: 1, amount: 2, category: 3, store: 4, note: 5, photoId: 6, by: 7, createdAt: 8, paidAt: 9 };
-var DEFAULT_CATEGORIES = ['Courses', 'Pharmacie / Santé', 'Enfants', 'Maison', 'Restaurant', 'Transport', 'Vêtements', 'Loisirs', 'Autre'];
+var HEADERS = ['id', 'date', 'montant', 'catégorie', 'magasin', 'note', 'photo_id', 'saisi_par', 'créé_le', 'remboursé_le', 'sécu'];
+var COL = { id: 0, date: 1, amount: 2, category: 3, store: 4, note: 5, photoId: 6, by: 7, createdAt: 8, paidAt: 9, secu: 10 };
+var DEFAULT_CATEGORIES = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
 var FOLDER_NAME = 'Tickets remboursements';
 
 /** Crée les onglets, les en-têtes et le dossier Drive. À lancer une fois à la main. */
@@ -36,6 +36,15 @@ function setup() {
     DEFAULT_CATEGORIES.forEach(function (c) { cat.appendRow([c]); });
   }
   getFolder_();
+}
+
+/** Remplace le contenu de l'onglet Catégories par DEFAULT_CATEGORIES. À lancer à la main si besoin. */
+function resetCategories() {
+  var ss = SpreadsheetApp.getActive();
+  var cat = ss.getSheetByName(SHEET_CATEGORIES) || ss.insertSheet(SHEET_CATEGORIES);
+  cat.clear();
+  cat.getRange(1, 1, DEFAULT_CATEGORIES.length + 1, 1)
+    .setValues([['catégorie']].concat(DEFAULT_CATEGORIES.map(function (c) { return [c]; })));
 }
 
 function doGet() {
@@ -91,6 +100,8 @@ function withLock_(fn) {
 function sheet_() {
   var sh = SpreadsheetApp.getActive().getSheetByName(SHEET_EXPENSES);
   if (!sh) { setup(); sh = SpreadsheetApp.getActive().getSheetByName(SHEET_EXPENSES); }
+  // Sheet créé avec une ancienne version : on ajoute les en-têtes des nouvelles colonnes.
+  if (sh.getLastColumn() < HEADERS.length) sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   return sh;
 }
 
@@ -110,8 +121,14 @@ function str_(v) {
   return v === null || v === undefined ? '' : String(v);
 }
 
+function secuToCell_(v) {
+  return v === true ? 'oui' : v === false ? 'non' : '';
+}
+
 function rowToExpense_(r) {
+  var secu = str_(r[COL.secu]).toLowerCase();
   return {
+    secu: secu === 'oui' ? true : secu === 'non' ? false : undefined,
     id: str_(r[COL.id]),
     date: str_(r[COL.date]),
     amount: Number(r[COL.amount]) || 0,
@@ -169,7 +186,7 @@ function add_(x) {
   var photoId = x.photo ? savePhoto_(x.photo, x) : '';
   var row = [
     x.id, x.date, Number(x.amount) || 0, x.category || '', x.store || '', x.note || '',
-    photoId, x.by || '', new Date().toISOString(), ''
+    photoId, x.by || '', new Date().toISOString(), '', secuToCell_(x.secu)
   ];
   sheet_().appendRow(row);
   return rowToExpense_(row);
@@ -184,6 +201,7 @@ function update_(x) {
   r[COL.category] = x.category || '';
   r[COL.store] = x.store || '';
   r[COL.note] = x.note || '';
+  r[COL.secu] = secuToCell_(x.secu);
   if (x.photo) r[COL.photoId] = savePhoto_(x.photo, x);
   sheet_().getRange(found.index, 1, 1, HEADERS.length).setValues([r]);
   return rowToExpense_(r);

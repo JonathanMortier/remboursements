@@ -11,6 +11,8 @@ export interface Expense {
   by: string;
   createdAt?: string;
   paidAt?: string;
+  /** Dépense de soin : remboursée (true) ou non (false) par la Sécu. Absent hors soins. */
+  secu?: boolean;
 }
 
 /** Dépense à envoyer : peut contenir la photo en base64. */
@@ -18,17 +20,11 @@ export interface ExpenseInput extends Expense {
   photo?: string;
 }
 
-export const DEFAULT_CATEGORIES = [
-  'Courses',
-  'Pharmacie / Santé',
-  'Enfants',
-  'Maison',
-  'Restaurant',
-  'Transport',
-  'Vêtements',
-  'Loisirs',
-  'Autre',
-];
+export const DEFAULT_CATEGORIES = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
+
+/** Catégories de soins, pour lesquelles on indique le remboursement Sécu. */
+export const isCare = (category: string) =>
+  /pharma|psy|sant[ée]|soin|m[ée]dec|docteur|dentist|kin[ée]|ortho|optic|lunett|h[ôo]pital|labo/i.test(category);
 
 export class NetworkError extends Error {}
 export class ServerError extends Error {}

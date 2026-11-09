@@ -1,4 +1,4 @@
-import { api, NetworkError, type Expense, type ExpenseInput } from '../api';
+import { api, isCare, NetworkError, type Expense, type ExpenseInput } from '../api';
 import { formatEuro, h, parseAmount, toast, todayIso, uuid } from '../dom';
 import { compressForUpload, loadImage } from '../image';
 import { readReceipt, warmUpOcr } from '../ocr';
@@ -6,7 +6,12 @@ import { enqueue, flush } from '../queue';
 import { getSettings } from '../settings';
 
 /** Formulaire d'ajout (initial absent) ou de modification d'une dépense. */
-export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: Expense) => void): void {
+export function renderForm(
+  root: HTMLElement,
+  initial?: Expense,
+  onSaved?: (e: Expense) => void,
+  onCancel?: () => void,
+): void {
   const editing = Boolean(initial);
   let photo: string | undefined; // base64 de la photo compressée
   const touched = new Set<string>();
@@ -18,7 +23,7 @@ export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: E
     placeholder: '0,00',
     autocomplete: 'off',
     required: true,
-    value: initial ? String(initial.amount).replace('.', ',') : '',
+    value: initial ? initial.amount.toFixed(2).replace('.', ',') : '',
     oninput: () => touched.add('amount'),
   });
   const date = h('input', {
@@ -32,7 +37,7 @@ export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: E
   const cats = api.cachedCategories();
   const category = h(
     'select',
-    { id: 'category', required: true },
+    { id: 'category', required: true, onchange: () => updateSecu() },
     h('option', { value: '' }, 'Choisir…'),
     cats.map((c) => h('option', { value: c, selected: initial?.category === c }, c)),
   );
@@ -48,6 +53,19 @@ export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: E
   });
   const note = h('input', { id: 'note', type: 'text', placeholder: 'Optionnel', value: initial?.note ?? '' });
 
+  // Interrupteur « remboursé par la Sécu », visible seulement pour les soins.
+  const secu = h('input', { id: 'secu', type: 'checkbox', role: 'switch', checked: initial?.secu === true });
+  const secuRow = h(
+    'label',
+    { class: 'switch-row', for: 'secu' },
+    h('span', null, 'Remboursé par la Sécu'),
+    secu,
+  );
+  function updateSecu() {
+    secuRow.hidden = !isCare(category.value);
+  }
+  updateSecu();
+
   // Mise à jour des catégories depuis le Sheet (sans écraser la sélection).
   api.categories().then((fresh) => {
     const selected = category.value;
@@ -57,6 +75,7 @@ export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: E
         h('option', { value: c, selected: c === selected }, c),
       ),
     );
+    updateSecu();
   });
 
   const preview = h('img', { class: 'preview', alt: 'Ticket', hidden: true });
@@ -153,6 +172,7 @@ export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: E
           store: store.value.trim(),
           note: note.value.trim(),
           by: initial?.by ?? getSettings().name,
+          secu: isCare(category.value) ? secu.checked : undefined,
           photo,
         };
         submit.disabled = true;
@@ -195,11 +215,13 @@ export function renderForm(root: HTMLElement, initial?: Expense, onSaved?: (e: E
     date,
     h('label', { for: 'category' }, 'Catégorie'),
     category,
+    secuRow,
     h('label', { for: 'store' }, 'Magasin'),
     store,
     h('label', { for: 'note' }, 'Note'),
     note,
     submit,
+    onCancel ? h('button', { type: 'button', class: 'cancel', onclick: onCancel }, 'Annuler') : null,
   );
 
   root.replaceChildren(h('h1', null, editing ? 'Modifier la dépense' : 'Nouvelle dépense'), form);
