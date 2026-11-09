@@ -81,6 +81,20 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 #amount { font-size: 1.6rem; font-weight: 600; }
 
+.password { position: relative; }
+.password input { padding-right: 52px; }
+.password .eye {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 48px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 1.2rem;
+}
+
 button, .button {
   min-height: 46px;
   padding: 10px 16px;

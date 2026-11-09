@@ -14,6 +14,23 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
     autocomplete: 'off',
   });
   const secret = h('input', { id: 'secret', type: 'password', value: s.secret, autocomplete: 'off' });
+  const eye = h(
+    'button',
+    {
+      type: 'button',
+      class: 'eye',
+      'aria-label': 'Afficher le code secret',
+      'aria-pressed': 'false',
+      onclick: () => {
+        const show = secret.type === 'password';
+        secret.type = show ? 'text' : 'password';
+        eye.textContent = show ? '🙈' : '👁️';
+        eye.setAttribute('aria-label', show ? 'Masquer le code secret' : 'Afficher le code secret');
+        eye.setAttribute('aria-pressed', String(show));
+      },
+    },
+    '👁️',
+  );
   const code = h('textarea', { rows: 3, placeholder: "Colle ici le code copié depuis l'autre téléphone" });
 
   const save = async (e: Event) => {
@@ -43,7 +60,7 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       h('label', { for: 'url' }, 'URL du script Google'),
       url,
       h('label', { for: 'secret' }, 'Code secret'),
-      secret,
+      h('div', { class: 'password' }, secret, eye),
       h('button', { type: 'submit', class: 'primary big' }, 'Enregistrer et tester'),
     ),
     h(

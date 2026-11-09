@@ -39,14 +39,27 @@ function setup() {
 }
 
 function doGet() {
-  return json_({ ok: true, data: 'Remboursements API OK' });
+  var secret = getSecret_();
+  return json_({
+    ok: true,
+    data: secret
+      ? 'Remboursements API OK — code secret défini (' + secret.length + ' caractères)'
+      : 'Remboursements API OK — ATTENTION : propriété SECRET absente'
+  });
+}
+
+function getSecret_() {
+  var props = PropertiesService.getScriptProperties();
+  var secret = props.getProperty('SECRET') || props.getProperty('secret') || '';
+  return secret.trim();
 }
 
 function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents);
-    var secret = PropertiesService.getScriptProperties().getProperty('SECRET');
-    if (!secret || req.secret !== secret) return json_({ ok: false, error: 'Code secret invalide' });
+    var secret = getSecret_();
+    if (!secret) return json_({ ok: false, error: 'Propriété SECRET absente dans les paramètres du script' });
+    if (String(req.secret || '').trim() !== secret) return json_({ ok: false, error: 'Code secret invalide' });
 
     switch (req.action) {
       case 'categories': return json_({ ok: true, data: categories_() });
