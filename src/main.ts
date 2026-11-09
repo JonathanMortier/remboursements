@@ -1,11 +1,13 @@
 import { registerSW } from 'virtual:pwa-register';
 import { currentMonth, h, toast } from './dom';
 import { flush, onQueueChange, pending } from './queue';
-import { isConfigured } from './settings';
+import { applyScriptParam, isConfigured } from './settings';
 import { renderForm } from './views/form';
 import { editTarget, renderMonth } from './views/month';
 import { renderSettings } from './views/settings';
 import './style.css';
+
+applyScriptParam();
 
 const main = document.getElementById('app')!;
 const tabs = {

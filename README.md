@@ -39,7 +39,12 @@ Le dépôt ne contient ni l'URL ni le code secret : ils sont saisis dans l'appli
 
 Ouvre ensuite l'appli **depuis l'icône** et va dans **Réglages** : saisis ton prénom, l'URL `/exec` et le code secret. Sur iPhone, l'appli installée ne partage pas son stockage avec Safari ; la configuration doit donc se faire dans l'appli installée.
 
-Pour configurer le deuxième téléphone plus vite : *Réglages → Partager le code de configuration*, envoie le code, puis colle-le dans *Importer le code* sur l'autre téléphone.
+Pour le deuxième téléphone, utilise le **QR code** affiché dans *Réglages → Installer sur un autre téléphone* :
+1. Scanne-le avec l'appareil photo de l'autre téléphone.
+2. Installe l'appli depuis la page qui s'ouvre.
+3. Ouvre l'appli installée : l'URL du script est déjà remplie, il ne reste que le prénom et le code secret.
+
+Le lien contient l'URL du script mais pas le code secret. Seules les URL `https://script.google.com/macros/…` sont acceptées.
 
 ## Utilisation
 

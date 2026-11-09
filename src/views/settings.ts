@@ -1,7 +1,14 @@
 import { api } from '../api';
 import { h, toast } from '../dom';
 import { flush, pending } from '../queue';
-import { exportConfigCode, getSettings, importConfigCode, saveSettings } from '../settings';
+import {
+  exportConfigCode,
+  getSettings,
+  importConfigCode,
+  installLink,
+  isValidScriptUrl,
+  saveSettings,
+} from '../settings';
 
 export async function renderSettings(root: HTMLElement): Promise<void> {
   const s = getSettings();
@@ -36,6 +43,10 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
   const save = async (e: Event) => {
     e.preventDefault();
     if (!name.value.trim()) return toast('Indique ton prénom', 'error');
+    // En développement, le faux backend local (http://localhost) reste autorisé.
+    if (!isValidScriptUrl(url.value.trim()) && !import.meta.env.DEV) {
+      return toast("L'URL doit commencer par https://script.google.com/macros/", 'error');
+    }
     saveSettings({ name: name.value.trim(), url: url.value.trim(), secret: secret.value.trim() });
     try {
       await api.ping();
@@ -49,9 +60,13 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
   };
 
   const queued = (await pending()).length;
+  const prefilled = Boolean(s.url && !s.secret);
 
   root.replaceChildren(
     h('h1', null, 'Réglages'),
+    prefilled
+      ? h('p', { class: 'banner ok' }, "✓ URL du script pré-remplie. Il ne reste qu'à saisir ton prénom et le code secret.")
+      : '',
     h(
       'form',
       { class: 'card form', onsubmit: save },
@@ -63,52 +78,7 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       h('div', { class: 'password' }, secret, eye),
       h('button', { type: 'submit', class: 'primary big' }, 'Enregistrer et tester'),
     ),
-    h(
-      'section',
-      { class: 'card form' },
-      h('h2', null, 'Configurer l’autre téléphone'),
-      h('p', { class: 'hint' }, "Copie ce code et envoie-le (SMS, WhatsApp…). Sur l'autre téléphone, colle-le ci-dessous, depuis l'appli installée."),
-      h(
-        'button',
-        {
-          type: 'button',
-          disabled: !s.url,
-          onclick: async () => {
-            const c = exportConfigCode();
-            try {
-              if (navigator.share) await navigator.share({ text: c });
-              else {
-                await navigator.clipboard.writeText(c);
-                toast('Code copié');
-              }
-            } catch {
-              code.value = c;
-              code.select();
-            }
-          },
-        },
-        'Partager le code de configuration',
-      ),
-      code,
-      h(
-        'button',
-        {
-          type: 'button',
-          onclick: () => {
-            try {
-              const c = importConfigCode(code.value);
-              url.value = c.url;
-              secret.value = c.secret;
-              toast('Code importé : indique ton prénom puis enregistre');
-              name.focus();
-            } catch {
-              toast('Code invalide', 'error');
-            }
-          },
-        },
-        'Importer le code',
-      ),
-    ),
+    await shareSection(code, url, secret, name),
     queued
       ? h(
           'section',
@@ -120,7 +90,10 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
               type: 'button',
               onclick: async () => {
                 const r = await flush();
-                toast(r.remaining ? `Toujours ${r.remaining} en attente${r.error ? ' : ' + r.error : ''}` : 'Tout est envoyé', r.remaining ? 'warn' : 'ok');
+                toast(
+                  r.remaining ? `Toujours ${r.remaining} en attente${r.error ? ' : ' + r.error : ''}` : 'Tout est envoyé',
+                  r.remaining ? 'warn' : 'ok',
+                );
                 renderSettings(root);
               },
             },
@@ -129,4 +102,121 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
         )
       : '',
   );
+  if (prefilled) name.focus();
+}
+
+/** QR code d'installation + méthode alternative par code de configuration. */
+async function shareSection(
+  code: HTMLTextAreaElement,
+  url: HTMLInputElement,
+  secret: HTMLInputElement,
+  name: HTMLInputElement,
+): Promise<HTMLElement> {
+  const { url: savedUrl } = getSettings();
+  const section = h('section', { class: 'card form' }, h('h2', null, 'Installer sur un autre téléphone'));
+
+  if (!isValidScriptUrl(savedUrl)) {
+    section.append(h('p', { class: 'hint' }, "Enregistre d'abord l'URL du script Google pour obtenir le QR code."));
+  } else {
+    const link = installLink();
+    const qr = h('div', { class: 'qr', role: 'img', 'aria-label': "QR code d'installation" });
+    try {
+      const QRCode = await import('qrcode');
+      // SVG généré par la bibliothèque à partir du lien : pas de donnée utilisateur brute injectée.
+      qr.innerHTML = await QRCode.toString(link, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
+    } catch {
+      qr.textContent = 'QR code indisponible';
+    }
+    section.append(
+      h(
+        'p',
+        { class: 'hint' },
+        "Scanne ce QR code avec l'appareil photo de l'autre téléphone, puis installe l'appli depuis la page qui s'ouvre :",
+      ),
+      h(
+        'ul',
+        { class: 'hint steps' },
+        h('li', null, 'Android (Chrome) : menu ⋮ → Installer l’application'),
+        h('li', null, 'iPhone (Safari) : Partager → Sur l’écran d’accueil'),
+      ),
+      qr,
+      h(
+        'p',
+        { class: 'hint' },
+        "Ouvre ensuite l'appli installée : l'URL du script sera déjà remplie, il restera le prénom et le code secret.",
+      ),
+      h(
+        'button',
+        {
+          type: 'button',
+          onclick: async () => {
+            try {
+              if (navigator.share) await navigator.share({ title: 'Remboursements', url: link });
+              else {
+                await navigator.clipboard.writeText(link);
+                toast('Lien copié');
+              }
+            } catch {
+              /* partage annulé */
+            }
+          },
+        },
+        'Partager le lien',
+      ),
+    );
+  }
+
+  section.append(
+    h(
+      'details',
+      { class: 'alt' },
+      h('summary', null, 'Autre méthode : code de configuration (URL + code secret)'),
+      h(
+        'div',
+        { class: 'form' },
+        h('p', { class: 'hint' }, "Ce code contient aussi le code secret : envoie-le seulement à l'autre utilisateur."),
+        h(
+          'button',
+          {
+            type: 'button',
+            disabled: !savedUrl,
+            onclick: async () => {
+              const c = exportConfigCode();
+              try {
+                if (navigator.share) await navigator.share({ text: c });
+                else {
+                  await navigator.clipboard.writeText(c);
+                  toast('Code copié');
+                }
+              } catch {
+                code.value = c;
+                code.select();
+              }
+            },
+          },
+          'Partager le code de configuration',
+        ),
+        code,
+        h(
+          'button',
+          {
+            type: 'button',
+            onclick: () => {
+              try {
+                const c = importConfigCode(code.value);
+                url.value = c.url;
+                secret.value = c.secret;
+                toast('Code importé : indique ton prénom puis enregistre');
+                name.focus();
+              } catch {
+                toast('Code invalide', 'error');
+              }
+            },
+          },
+          'Importer le code',
+        ),
+      ),
+    ),
+  );
+  return section;
 }

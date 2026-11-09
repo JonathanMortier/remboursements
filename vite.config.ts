@@ -15,7 +15,10 @@ export default defineConfig({
         short_name: 'Rembours.',
         description: 'Dépenses à rembourser chaque mois',
         lang: 'fr',
-        start_url: base,
+        // Pas de start_url : l'appli installée s'ouvre sur l'adresse d'installation, y compris
+        // le paramètre ?script=… du QR code (indispensable sur iPhone, dont l'appli installée
+        // ne partage pas le stockage avec Safari).
+        start_url: undefined,
         scope: base,
         display: 'standalone',
         orientation: 'portrait',

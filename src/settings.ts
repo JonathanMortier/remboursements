@@ -53,6 +53,31 @@ export function cacheSet(key: string, value: unknown): void {
   safeSet('remb.cache.' + key, JSON.stringify(value));
 }
 
+/** Seules les URL Apps Script sont acceptées : un lien piégé ne peut pas détourner le code secret. */
+export function isValidScriptUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname === 'script.google.com' && u.pathname.startsWith('/macros/');
+  } catch {
+    return false;
+  }
+}
+
+/** Lien d'installation avec l'URL du script en paramètre (pour le QR code). */
+export function installLink(): string {
+  const link = new URL(import.meta.env.BASE_URL, location.origin);
+  link.searchParams.set('script', getSettings().url);
+  return link.toString();
+}
+
+/** Au démarrage : pré-remplit l'URL du script depuis ?script=… si elle n'est pas encore configurée. */
+export function applyScriptParam(): void {
+  const param = new URLSearchParams(location.search).get('script');
+  if (!param || !isValidScriptUrl(param)) return;
+  const s = getSettings();
+  if (!s.url) saveSettings({ ...s, url: param });
+}
+
 /** Code de configuration à partager avec l'autre téléphone (URL + secret). */
 export function exportConfigCode(): string {
   const { url, secret } = getSettings();
@@ -61,6 +86,6 @@ export function exportConfigCode(): string {
 
 export function importConfigCode(code: string): { url: string; secret: string } {
   const parsed = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
-  if (!parsed.url || !parsed.secret) throw new Error('Code invalide');
+  if (!parsed.url || !parsed.secret || !isValidScriptUrl(parsed.url)) throw new Error('Code invalide');
   return { url: parsed.url, secret: parsed.secret };
 }
