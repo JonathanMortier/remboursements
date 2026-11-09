@@ -1,13 +1,17 @@
 import { api } from '../api';
 import { h, toast } from '../dom';
+import { icon } from '../icons';
 import { flush, pending } from '../queue';
 import {
   exportConfigCode,
   getSettings,
+  getTheme,
   importConfigCode,
   installLink,
   isValidScriptUrl,
   saveSettings,
+  setTheme,
+  type Theme,
 } from '../settings';
 
 export async function renderSettings(root: HTMLElement): Promise<void> {
@@ -31,12 +35,12 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       onclick: () => {
         const show = secret.type === 'password';
         secret.type = show ? 'text' : 'password';
-        eye.textContent = show ? '🙈' : '👁️';
+        eye.replaceChildren(icon(show ? 'eyeOff' : 'eye'));
         eye.setAttribute('aria-label', show ? 'Masquer le code secret' : 'Afficher le code secret');
         eye.setAttribute('aria-pressed', String(show));
       },
     },
-    '👁️',
+    icon('eye'),
   );
   const code = h('textarea', { rows: 3, placeholder: "Colle ici le code copié depuis l'autre téléphone" });
 
@@ -78,6 +82,7 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       h('div', { class: 'password' }, secret, eye),
       h('button', { type: 'submit', class: 'primary big' }, 'Enregistrer et tester'),
     ),
+    themeSection(),
     await shareSection(code, url, secret, name),
     queued
       ? h(
@@ -219,4 +224,32 @@ async function shareSection(
     ),
   );
   return section;
+}
+
+/** Choix du thème : appliqué tout de suite, sans bouton Enregistrer. */
+function themeSection(): HTMLElement {
+  const current = getTheme();
+  const options: [Theme, 'auto' | 'sun' | 'moon', string][] = [
+    ['auto', 'auto', 'Auto'],
+    ['light', 'sun', 'Clair'],
+    ['dark', 'moon', 'Sombre'],
+  ];
+  return h(
+    'section',
+    { class: 'card form' },
+    h('h2', { id: 'theme-label' }, 'Affichage'),
+    h(
+      'div',
+      { class: 'segmented', role: 'radiogroup', 'aria-labelledby': 'theme-label' },
+      options.map(([value, ic, label]) =>
+        h(
+          'label',
+          null,
+          h('input', { type: 'radio', name: 'theme', value, checked: value === current, onchange: () => setTheme(value) }),
+          h('span', null, icon(ic, 18), label),
+        ),
+      ),
+    ),
+    h('p', { class: 'hint' }, 'Auto suit le réglage clair / sombre du téléphone.'),
+  );
 }

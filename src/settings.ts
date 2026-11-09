@@ -39,6 +39,26 @@ export function isConfigured(): boolean {
   return Boolean(s.url && s.secret);
 }
 
+/** Thème d'affichage : suivre le téléphone, ou forcer clair / sombre. */
+export type Theme = 'auto' | 'light' | 'dark';
+const THEME_KEY = 'remb.theme';
+
+export function getTheme(): Theme {
+  const t = safeGet(THEME_KEY);
+  return t === 'light' || t === 'dark' ? t : 'auto';
+}
+
+export function setTheme(t: Theme): void {
+  safeSet(THEME_KEY, t);
+  applyTheme();
+}
+
+export function applyTheme(): void {
+  const t = getTheme();
+  if (t === 'auto') delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = t;
+}
+
 /** Petit cache JSON (dernière liste du mois, catégories) pour l'affichage hors ligne. */
 export function cacheGet<T>(key: string): T | null {
   try {

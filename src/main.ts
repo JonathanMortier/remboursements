@@ -1,19 +1,21 @@
 import { registerSW } from 'virtual:pwa-register';
 import { currentMonth, h, toast } from './dom';
 import { flush, onQueueChange, pending } from './queue';
-import { applyScriptParam, isConfigured } from './settings';
+import { icon } from './icons';
+import { applyScriptParam, applyTheme, isConfigured } from './settings';
 import { renderForm } from './views/form';
 import { renderMonth } from './views/month';
 import { renderSettings } from './views/settings';
 import './style.css';
 
+applyTheme();
 applyScriptParam();
 
 const main = document.getElementById('app')!;
 const tabs = {
-  add: h('a', { href: '#/add' }, h('span', null, '＋'), 'Ajouter'),
-  month: h('a', { href: '#/month' }, h('span', null, '€'), 'Mois'),
-  settings: h('a', { href: '#/settings' }, h('span', null, '⚙'), 'Réglages'),
+  add: h('a', { href: '#/add' }, icon('plus', 24), 'Ajouter'),
+  month: h('a', { href: '#/month' }, icon('euro', 24), 'Mois'),
+  settings: h('a', { href: '#/settings' }, icon('settings', 24), 'Réglages'),
 };
 const badge = h('i', { class: 'dot', hidden: true });
 tabs.month.append(badge);

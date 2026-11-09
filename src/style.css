@@ -4,6 +4,7 @@
   --text: #17201e;
   --muted: #5f6b68;
   --border: #dfe5e3;
+  --field-border: #7d8a87; /* contour des champs : contraste ≥ 3:1 (WCAG 1.4.11) */
   --accent: #0f766e;
   --accent-text: #ffffff;
   --accent-soft: #e2f3f1;
@@ -11,23 +12,41 @@
   --warn: #b45309;
   --error: #b91c1c;
   --radius: 14px;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
+/* Thème sombre : selon le téléphone (Auto) ou forcé dans les Réglages. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #0f1413;
     --card: #182120;
     --text: #e8eeec;
     --muted: #9aa8a5;
     --border: #2a3533;
+    --field-border: #677774;
     --accent: #2dd4bf;
     --accent-text: #062b27;
     --accent-soft: #123532;
     --ok: #4ade80;
     --warn: #fbbf24;
     --error: #f87171;
+    color-scheme: dark;
   }
+}
+:root[data-theme='dark'] {
+  --bg: #0f1413;
+  --card: #182120;
+  --text: #e8eeec;
+  --muted: #9aa8a5;
+  --border: #2a3533;
+  --field-border: #677774;
+  --accent: #2dd4bf;
+  --accent-text: #062b27;
+  --accent-soft: #123532;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --error: #f87171;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -70,10 +89,40 @@ a { color: var(--accent); }
   font-size: 1rem; color: var(--text); margin-top: 10px; cursor: pointer;
 }
 .form label.switch-row[hidden] { display: none; }
+.form label.field {
+  min-height: 46px; padding: 8px 12px; border: 1px solid var(--field-border); border-radius: 10px; background: var(--bg);
+}
+
+/* Pastilles de catégorie (boutons radio) */
+.chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chip { position: relative; margin: 0 !important; }
+.chip input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.chip span {
+  display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 6px 8px;
+  border: 1px solid var(--field-border); border-radius: 99px; background: var(--bg);
+  color: var(--text); font-size: 0.95rem; text-align: center; cursor: pointer;
+}
+.chip input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Sélecteur segmenté (thème) */
+.segmented { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--field-border); border-radius: 10px; overflow: hidden; }
+.segmented label { margin: 0 !important; position: relative; }
+.segmented label + label { border-left: 1px solid var(--field-border); }
+.segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.segmented span {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px;
+  color: var(--text); font-size: 0.95rem; cursor: pointer;
+}
+.segmented input:checked + span { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.segmented input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+/* Icônes SVG */
+.ic { flex: none; vertical-align: middle; }
 input[role='switch'] {
   appearance: none; -webkit-appearance: none;
   flex: none; width: 50px; min-height: 0; height: 30px; padding: 0; margin: 0;
-  border-radius: 99px; border: 1px solid var(--border); background: var(--border);
+  border-radius: 99px; border: 1px solid var(--field-border); background: var(--border);
   position: relative; cursor: pointer; transition: background 0.15s;
 }
 input[role='switch']::after {
@@ -93,7 +142,7 @@ input, select, textarea {
   width: 100%;
   min-height: 46px;
   padding: 10px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: 10px;
   background: var(--bg);
   font-size: 16px; /* évite le zoom auto sur iOS */
@@ -130,6 +179,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 }
 
 button, .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 46px;
   padding: 10px 16px;
   border-radius: 10px;
@@ -142,8 +195,10 @@ button:disabled { opacity: 0.55; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button.big { margin-top: 16px; min-height: 52px; }
 button.danger { color: var(--error); }
+button.outline { background: transparent; border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
-.photo-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+.photo-actions { display: grid; grid-template-columns: 3fr 2fr; gap: 8px; }
+.photo-actions button { min-height: 52px; }
 
 .preview {
   width: 100%;
@@ -180,18 +235,21 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
   text-decoration: none;
   color: var(--text);
 }
+.icon.small { width: 40px; height: 40px; color: var(--muted); }
 .icon.spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.summary { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.summary { position: relative; text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.summary .refresh { position: absolute; top: 6px; right: 6px; }
 .summary .label { margin: 0; color: var(--muted); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.06em; }
 .summary .amount { margin: 0; font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .summary .sub { margin: 0 0 8px; color: var(--muted); font-size: 0.9rem; }
 .summary.paid .amount { color: var(--ok); }
 
 .cats { display: flex; flex-direction: column; gap: 8px; }
-.cat { display: grid; grid-template-columns: 1fr 70px auto; align-items: center; gap: 10px; font-size: 0.92rem; }
-.cat .bar { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--w), var(--accent-soft) var(--w)); }
+.cat { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; font-size: 0.95rem; }
+.cat .bar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: linear-gradient(to right, var(--accent) var(--w), var(--accent-soft) var(--w)); }
+.cats { gap: 12px !important; }
 .cat strong { font-variant-numeric: tabular-nums; }
 
 .list { list-style: none; margin: 0; padding: 0; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -212,10 +270,11 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .item small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .right { align-items: flex-end; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
-.badge { font-size: 0.7rem; padding: 1px 7px; border-radius: 99px; margin-top: 2px; }
+.badge { font-size: 0.78rem; padding: 1px 7px; border-radius: 99px; margin-top: 2px; }
 .badge.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .badge.warn { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
 .badge.secu { background: var(--accent-soft); color: var(--accent); }
+.badge.muted { background: color-mix(in srgb, var(--muted) 15%, transparent); color: var(--muted); }
 
 .empty { text-align: center; color: var(--muted); padding: 30px 0; }
 .banner { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); padding: 10px 12px; border-radius: 10px; font-size: 0.9rem; }
@@ -239,6 +298,9 @@ dialog::backdrop {
 }
 body:has(dialog[open]) { overflow: hidden; } /* pas de défilement de l'arrière-plan */
 button.cancel { margin-top: 8px; }
+dialog .detail-head { margin-bottom: 12px; }
+dialog .detail-head .amount { margin: 0; font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+dialog .detail-head .sub { margin: 0; color: var(--muted); }
 dialog dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 10px; }
 dialog dt { color: var(--muted); }
 dialog dd { margin: 0; overflow-wrap: anywhere; }
@@ -261,12 +323,12 @@ dialog .actions button { flex: 1 1 40%; }
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
   padding: 8px 0 10px;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: var(--muted);
   text-decoration: none;
 }
-.tabs a span { font-size: 1.35rem; line-height: 1.2; }
 .tabs a.active { color: var(--accent); font-weight: 600; }
 .tabs .dot {
   position: absolute;

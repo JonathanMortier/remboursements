@@ -1,5 +1,6 @@
 import { api, isCare, NetworkError, type Expense, type ExpenseInput } from '../api';
 import { formatEuro, h, parseAmount, toast, todayIso, uuid } from '../dom';
+import { icon } from '../icons';
 import { compressForUpload, loadImage } from '../image';
 import { readReceipt, warmUpOcr } from '../ocr';
 import { enqueue, flush } from '../queue';
@@ -34,16 +35,32 @@ export function renderForm(
     max: todayIso(),
     oninput: () => touched.add('date'),
   });
-  const cats = api.cachedCategories();
-  const category = h(
-    'select',
-    { id: 'category', required: true, onchange: () => updateSecu() },
-    h('option', { value: '' }, 'Choisir…'),
-    cats.map((c) => h('option', { value: c, selected: initial?.category === c }, c)),
-  );
-  if (initial && !cats.includes(initial.category)) {
-    category.append(h('option', { value: initial.category, selected: true }, initial.category));
+  // Catégories en pastilles : un seul tap, tous les choix visibles.
+  let categoryValue = initial?.category ?? '';
+  const chips = h('div', { class: 'chips', role: 'radiogroup', 'aria-labelledby': 'category-label' });
+  function drawChips(list: string[]) {
+    const all = [...new Set([...list, ...(categoryValue && !list.includes(categoryValue) ? [categoryValue] : [])])];
+    chips.replaceChildren(
+      ...all.map((c) =>
+        h(
+          'label',
+          { class: 'chip' },
+          h('input', {
+            type: 'radio',
+            name: 'category',
+            value: c,
+            checked: c === categoryValue,
+            onchange: () => {
+              categoryValue = c;
+              updateSecu();
+            },
+          }),
+          h('span', null, c),
+        ),
+      ),
+    );
   }
+  drawChips(api.cachedCategories());
   const store = h('input', {
     id: 'store',
     type: 'text',
@@ -57,24 +74,18 @@ export function renderForm(
   const secu = h('input', { id: 'secu', type: 'checkbox', role: 'switch', checked: initial?.secu === true });
   const secuRow = h(
     'label',
-    { class: 'switch-row', for: 'secu' },
+    { class: 'switch-row field', for: 'secu' },
     h('span', null, 'Remboursé par la Sécu'),
     secu,
   );
   function updateSecu() {
-    secuRow.hidden = !isCare(category.value);
+    secuRow.hidden = !isCare(categoryValue);
   }
   updateSecu();
 
   // Mise à jour des catégories depuis le Sheet (sans écraser la sélection).
   api.categories().then((fresh) => {
-    const selected = category.value;
-    category.replaceChildren(
-      h('option', { value: '' }, 'Choisir…'),
-      ...[...new Set([...fresh, ...(selected && !fresh.includes(selected) ? [selected] : [])])].map((c) =>
-        h('option', { value: c, selected: c === selected }, c),
-      ),
-    );
+    drawChips(fresh);
     updateSecu();
   });
 
@@ -162,17 +173,17 @@ export function renderForm(
         const value = parseAmount(amount.value);
         if (!value) return toast('Montant invalide', 'error'), amount.focus();
         if (!date.value) return toast('Date manquante', 'error');
-        if (!category.value) return toast('Choisis une catégorie', 'error'), category.focus();
+        if (!categoryValue) return toast('Choisis une catégorie', 'error'), chips.querySelector('input')?.focus();
 
         const expense: ExpenseInput = {
           id: initial?.id ?? uuid(),
           date: date.value,
           amount: value,
-          category: category.value,
+          category: categoryValue,
           store: store.value.trim(),
           note: note.value.trim(),
           by: initial?.by ?? getSettings().name,
-          secu: isCare(category.value) ? secu.checked : undefined,
+          secu: isCare(categoryValue) ? secu.checked : undefined,
           photo,
         };
         submit.disabled = true;
@@ -199,8 +210,9 @@ export function renderForm(
     h(
       'div',
       { class: 'photo-actions' },
-      h('button', { type: 'button', class: 'primary', onclick: () => camera.click() }, '📷 Photo du ticket'),
-      h('button', { type: 'button', onclick: () => gallery.click() }, '🖼️ Galerie'),
+      // En modification, la photo est secondaire : le seul bouton principal est « Enregistrer ».
+      h('button', { type: 'button', class: editing ? '' : 'primary', onclick: () => camera.click() }, icon('camera'), 'Photo du ticket'),
+      h('button', { type: 'button', onclick: () => gallery.click() }, icon('image'), 'Galerie'),
       camera,
       gallery,
     ),
@@ -213,8 +225,8 @@ export function renderForm(
     amount,
     h('label', { for: 'date' }, 'Date de la dépense'),
     date,
-    h('label', { for: 'category' }, 'Catégorie'),
-    category,
+    h('label', { id: 'category-label' }, 'Catégorie'),
+    chips,
     secuRow,
     h('label', { for: 'store' }, 'Magasin'),
     store,

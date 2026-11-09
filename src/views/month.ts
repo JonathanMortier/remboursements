@@ -1,4 +1,5 @@
 import { api, type Expense } from '../api';
+import { icon } from '../icons';
 import { dateLabel, formatEuro, h, monthLabel, shiftMonth, toast } from '../dom';
 import { flush, pending, removePending } from '../queue';
 import { renderForm } from './form';
@@ -8,16 +9,20 @@ type Row = Expense & { pending?: boolean };
 export async function renderMonth(root: HTMLElement, month: string): Promise<void> {
   const body = h('div', { class: 'month-body' });
   const banner = h('p', { class: 'banner', hidden: true });
-  const refresh = h('button', { class: 'icon', title: 'Actualiser', 'aria-label': 'Actualiser', onclick: () => load(true) }, '⟳');
+  // Bouton Actualiser dans la carte du total, loin des flèches de navigation.
+  const refresh = h(
+    'button',
+    { class: 'icon small refresh', title: 'Actualiser', 'aria-label': 'Actualiser', onclick: () => load(true) },
+    icon('refresh', 18),
+  );
 
   root.replaceChildren(
     h(
       'div',
       { class: 'month-nav' },
-      h('a', { class: 'icon', href: '#/month/' + shiftMonth(month, -1), 'aria-label': 'Mois précédent' }, '‹'),
+      h('a', { class: 'icon', href: '#/month/' + shiftMonth(month, -1), 'aria-label': 'Mois précédent' }, icon('prev', 26)),
       h('h1', null, monthLabel(month)),
-      h('a', { class: 'icon', href: '#/month/' + shiftMonth(month, 1), 'aria-label': 'Mois suivant' }, '›'),
-      refresh,
+      h('a', { class: 'icon', href: '#/month/' + shiftMonth(month, 1), 'aria-label': 'Mois suivant' }, icon('next', 26)),
     ),
     banner,
     body,
@@ -42,6 +47,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
     const summary = h(
       'section',
       { class: 'card summary' + (allPaid ? ' paid' : '') },
+      refresh,
       h('p', { class: 'label' }, allPaid ? 'Remboursé' : 'À rembourser'),
       h('p', { class: 'amount' }, formatEuro(allPaid ? total : unpaid)),
       allPaid
@@ -53,7 +59,8 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         ? h(
             'button',
             {
-              class: allPaid ? '' : 'primary',
+              // Action de fin de mois : visible mais secondaire, le total reste le point focal.
+              class: 'outline',
               onclick: async (e: Event) => {
                 const paid = !allPaid;
                 const msg = paid
@@ -70,7 +77,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
                 load(true);
               },
             },
-            allPaid ? 'Annuler le remboursement' : '✓ Marquer comme remboursé',
+            allPaid ? [icon('x', 18), 'Annuler le remboursement'] : [icon('check', 18), 'Marquer comme remboursé'],
           )
         : null,
     );
@@ -86,8 +93,8 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
                 'div',
                 { class: 'cat' },
                 h('span', null, c),
-                h('span', { class: 'bar', style: `--w:${Math.round((v / total) * 100)}%` }),
                 h('strong', null, formatEuro(v)),
+                h('span', { class: 'bar', style: `--w:${Math.max(2, Math.round((v / total) * 100))}%` }),
               ),
             ),
         )
@@ -118,7 +125,9 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
                   'div',
                   { class: 'right' },
                   h('strong', null, formatEuro(x.amount)),
-                  x.secu ? h('span', { class: 'badge secu' }, 'Sécu') : null,
+                  x.secu !== undefined
+                    ? h('span', { class: 'badge ' + (x.secu ? 'secu' : 'muted') }, x.secu ? 'Sécu ✓' : 'Sécu ✗')
+                    : null,
                   x.pending
                     ? h('span', { class: 'badge warn' }, 'en attente')
                     : x.paidAt
@@ -139,7 +148,12 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
     const dialog: HTMLDialogElement = h(
       'dialog',
       { class: 'detail', onclose: () => dialog.remove() },
-      h('h2', null, formatEuro(x.amount)),
+      h(
+        'header',
+        { class: 'detail-head' },
+        h('p', { class: 'amount' }, formatEuro(x.amount)),
+        h('p', { class: 'sub' }, x.store || x.category),
+      ),
       h(
         'dl',
         null,
@@ -148,7 +162,6 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         h('dt', null, 'Catégorie'),
         h('dd', null, x.category),
         x.secu !== undefined ? [h('dt', null, 'Sécu'), h('dd', null, x.secu ? 'Remboursé' : 'Non remboursé')] : null,
-        x.store ? [h('dt', null, 'Magasin'), h('dd', null, x.store)] : null,
         x.note ? [h('dt', null, 'Note'), h('dd', null, x.note)] : null,
         x.by ? [h('dt', null, 'Saisi par'), h('dd', null, x.by)] : null,
         x.paidAt ? [h('dt', null, 'Remboursé'), h('dd', null, dateLabel(x.paidAt.slice(0, 10)))] : null,
