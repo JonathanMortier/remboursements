@@ -1,0 +1,41 @@
+# Montées de version automatiques.
+# - Correctifs de sécurité : PR ouverte dès qu'une faille est publiée
+#   (nécessite « Dependabot security updates » activé dans Settings > Code security).
+# - Mises à jour classiques : une fois par semaine, regroupées en une seule PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '08:00'
+      timezone: Europe/Paris
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'deps'
+    labels:
+      - dependencies
+    groups:
+      # Toutes les failles de sécurité npm dans une même PR.
+      securite:
+        applies-to: security-updates
+        patterns: ['*']
+      # Mineures et correctifs regroupés ; les majeures restent en PR séparées.
+      mineures:
+        applies-to: version-updates
+        update-types: [minor, patch]
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+      timezone: Europe/Paris
+    commit-message:
+      prefix: 'ci'
+    labels:
+      - dependencies
+    groups:
+      actions:
+        patterns: ['*']
