@@ -7,7 +7,7 @@ import { b64urlEncode, sendPush } from '../worker/src/webpush.js';
 
 const SECRET = 'test';
 const PORT = Number(process.env.PORT) || 8787;
-const categories = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
+const categories = ['Courses', 'Pharma', 'Soins', 'Magasins', 'Divers', 'Transports'];
 const expenses = [];
 const photos = new Map();
 

@@ -23,7 +23,7 @@ export interface ExpenseInput extends Expense {
   photo?: string;
 }
 
-export const DEFAULT_CATEGORIES = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
+export const DEFAULT_CATEGORIES = ['Courses', 'Pharma', 'Soins', 'Magasins', 'Divers', 'Transports'];
 
 
 export class NetworkError extends Error {}
