@@ -402,15 +402,33 @@ function recapPayload_(month) {
   return payload;
 }
 
-/** Déclenché le 1er de chaque mois : récap du mois précédent envoyé à tous les abonnés. */
+/** Envoie le récap du mois « AAAA-MM » à tous les abonnés, en expliquant ce qui se passe dans le journal. */
+function envoyerRecap_(month) {
+  var payload = recapPayload_(month);
+  if (!payload) {
+    console.log('Récap ' + month + ' : aucune dépense ce mois-là, rien à envoyer.');
+    return;
+  }
+  var subs = allSubs_();
+  if (!subs.length) {
+    console.log('Récap ' + month + ' : aucun téléphone abonné aux notifications.');
+    return;
+  }
+  var r = sendPush_(subs, payload);
+  console.log('Récap ' + month + ' « ' + payload.title + ' » : envoyé à ' + r.sent + ' appareil(s)' +
+    (r.failed ? ', ' + r.failed + ' échec(s)' : '') + (r.configured ? '' : ' (PUSH_URL / PUSH_SECRET absents)'));
+}
+
+/** Déclenché le 1er de chaque mois : récap du mois précédent. */
 function recapMensuel() {
   var now = new Date();
   var prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  var month = Utilities.formatDate(prev, Session.getScriptTimeZone(), 'yyyy-MM');
-  var payload = recapPayload_(month);
-  if (!payload) return;
-  var subs = allSubs_();
-  if (subs.length) sendPush_(subs, payload);
+  envoyerRecap_(Utilities.formatDate(prev, Session.getScriptTimeZone(), 'yyyy-MM'));
+}
+
+/** Pour tester à la main : récap du mois en cours. */
+function testerRecap() {
+  envoyerRecap_(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM'));
 }
 
 /** À lancer une fois à la main : programme recapMensuel le 1er de chaque mois vers 9 h. */

@@ -90,7 +90,7 @@ Le 1er de chaque mois vers 9 h, vous recevez tous les deux un récap du mois pr�
 Pour l'activer (une seule fois, après avoir mis en place les notifications) :
 1. Colle le nouveau `Code.gs`, puis *Déployer → Gérer les déploiements → ✏️ → Nouvelle version*.
 2. Dans l'éditeur, sélectionne la fonction `installerRecapMensuel` puis **▶ Exécuter**. Accepte la demande d'autorisation (« déclencheurs »).
-3. Pour tester tout de suite, exécute `recapMensuel` : le récap du mois précédent arrive sur vos téléphones.
+3. Pour tester tout de suite, exécute `testerRecap` : le récap du **mois en cours** arrive sur vos téléphones. Le journal d’exécution indique ce qui a été envoyé (ou pourquoi rien ne l’a été : aucun abonné, mois sans dépense…).
 
 ## Utilisation
 
