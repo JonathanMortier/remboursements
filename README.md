@@ -75,7 +75,8 @@ Le script Google ne sait pas signer des notifications Web Push. L'envoi passe do
    - `PUSH_SECRET` = le même mot de passe qu'à l'étape 4 ;
    - `VAPID_PUBLIC_KEY` = la clé publique.
 
-   Ensuite *Déployer → Gérer les déploiements → ✏️ → Nouvelle version* (l'URL ne change pas). Au premier lancement, Google demande une nouvelle autorisation (« se connecter à un service externe ») : accepte-la.
+   Ensuite *Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version* (l'URL ne change pas).
+   Puis, dans l'éditeur, sélectionne la fonction `autoriserNotifications` et clique sur **▶ Exécuter** : Google demande la nouvelle autorisation « se connecter à un service externe ». Accepte-la (Paramètres avancés → Accéder au projet → Autoriser). Sans cette étape, l'envoi échoue avec « Vous n'êtes pas autorisé à appeler UrlFetchApp.fetch ».
 6. **Sur chaque téléphone** : *Réglages → Notifications → Activer les notifications*, accepte la demande d'autorisation, puis *Envoyer un test*.
    - **iPhone** : iOS 16.4 minimum, et l'appli doit être **installée sur l'écran d'accueil** et ouverte depuis son icône.
    - On ne reçoit pas de notification pour ses propres ajouts.

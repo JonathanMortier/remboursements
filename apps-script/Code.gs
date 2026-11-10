@@ -253,6 +253,19 @@ function photo_(photoId) {
 
 // --- Notifications ------------------------------------------------------------
 
+/**
+ * À lancer une fois à la main dans l'éditeur : déclenche l'autorisation « service externe »
+ * (UrlFetchApp) et vérifie que le relais Cloudflare répond.
+ */
+function autoriserNotifications() {
+  var cfg = pushConfig_();
+  if (!cfg.url) throw new Error('Propriété PUSH_URL absente dans les paramètres du script');
+  var res = UrlFetchApp.fetch(cfg.url + '/', { muteHttpExceptions: true });
+  console.log('Relais ' + cfg.url + ' → ' + res.getResponseCode() + ' ' + res.getContentText());
+  if (!cfg.secret) console.warn('Propriété PUSH_SECRET absente');
+  if (!cfg.publicKey) console.warn('Propriété VAPID_PUBLIC_KEY absente');
+}
+
 function pushConfig_() {
   var props = PropertiesService.getScriptProperties();
   return {
