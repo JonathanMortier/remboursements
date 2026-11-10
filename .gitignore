@@ -5,3 +5,5 @@ dev-dist
 .claude/settings.local.json*
 .wrangler
 apps-script-proprietes.txt
+playwright-report
+test-results

@@ -1,4 +1,5 @@
 import { cacheGet, cacheSet, getSettings } from './settings';
+import { learn } from './storecat';
 
 export interface Expense {
   id: string;
@@ -70,6 +71,7 @@ export const api = {
   async list(month: string): Promise<Expense[]> {
     const list = await call<Expense[]>('list', { month });
     cacheSet('month.' + month, list);
+    learn(list);
     return list;
   },
   cachedList(month: string): Expense[] | null {

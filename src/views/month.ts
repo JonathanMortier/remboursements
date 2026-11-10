@@ -3,6 +3,7 @@ import { icon } from '../icons';
 import { dateLabel, formatEuro, h, monthLabel, shiftMonth, toast } from '../dom';
 import { flush, pending, removePending } from '../queue';
 import { renderForm } from './form';
+import { categoryBars } from './stats';
 
 type Row = Expense & { pending?: boolean };
 
@@ -21,14 +22,24 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
       'div',
       { class: 'month-nav' },
       h('a', { class: 'icon', href: '#/month/' + shiftMonth(month, -1), 'aria-label': 'Mois précédent' }, icon('prev', 26)),
-      h('h1', null, monthLabel(month)),
+      // Le titre mène à la vue année.
+      h(
+        'h1',
+        null,
+        h('a', { class: 'title-link', href: '#/year/' + month.slice(0, 4), 'aria-label': `${monthLabel(month)} : voir l’année` }, monthLabel(month), icon('calendar', 18)),
+      ),
       h('a', { class: 'icon', href: '#/month/' + shiftMonth(month, 1), 'aria-label': 'Mois suivant' }, icon('next', 26)),
     ),
     banner,
     body,
   );
 
+  // Filtre par catégorie : conservé entre deux rafraîchissements de la liste.
+  let filter: string | null = null;
+  let lastList: Expense[] = [];
+
   async function draw(list: Expense[]) {
+    lastList = list;
     const queued: Row[] = (await pending())
       .filter((x) => x.date.startsWith(month))
       .map(({ photo: _p, ...x }) => ({ ...x, pending: true }));
@@ -43,8 +54,8 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
     // Part du montant affiché pour laquelle un remboursement est attendu (Sécu, mutuelle…).
     const expected = rows.filter((x) => x.secu && (allPaid || !x.paidAt)).reduce((s, x) => s + x.amount, 0);
 
-    const byCat = new Map<string, number>();
-    for (const x of rows) byCat.set(x.category, (byCat.get(x.category) ?? 0) + x.amount);
+    if (filter && !rows.some((x) => x.category === filter)) filter = null;
+    const shown = filter ? rows.filter((x) => x.category === filter) : rows;
 
     const summary = h(
       'section',
@@ -96,21 +107,20 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         : null,
     );
 
-    const cats = byCat.size
+    const cats = categoryBars(rows, {
+      active: filter,
+      onSelect: (c) => {
+        filter = filter === c ? null : c;
+        draw(lastList);
+      },
+    });
+
+    const filterChip = filter
       ? h(
-          'section',
-          { class: 'card cats' },
-          [...byCat]
-            .sort((a, b) => b[1] - a[1])
-            .map(([c, v]) =>
-              h(
-                'div',
-                { class: 'cat' },
-                h('span', null, c),
-                h('strong', null, formatEuro(v)),
-                h('span', { class: 'bar', style: `--w:${Math.max(2, Math.round((v / total) * 100))}%` }),
-              ),
-            ),
+          'button',
+          { type: 'button', class: 'filter-chip', onclick: () => ((filter = null), draw(lastList)) },
+          `${filter} · ${shown.length} dépense${shown.length > 1 ? 's' : ''}`,
+          icon('x', 16),
         )
       : null;
 
@@ -118,7 +128,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
       ? h(
           'ul',
           { class: 'list' },
-          rows.map((x) =>
+          shown.map((x) =>
             h(
               'li',
               null,
@@ -152,7 +162,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         )
       : h('p', { class: 'empty' }, 'Aucune dépense ce mois-ci.', h('br'), h('a', { href: '#/add' }, 'Ajouter une dépense'));
 
-    body.replaceChildren(summary, cats ?? '', items);
+    body.replaceChildren(summary, cats ?? '', filterChip ?? '', items);
   }
 
   function openDetail(x: Row) {

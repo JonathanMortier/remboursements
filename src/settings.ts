@@ -6,7 +6,7 @@ export interface Settings {
 
 const KEY = 'remb.settings';
 
-function safeGet(key: string): string | null {
+export function safeGet(key: string): string | null {
   try {
     return localStorage.getItem(key);
   } catch {
@@ -14,7 +14,7 @@ function safeGet(key: string): string | null {
   }
 }
 
-function safeSet(key: string, value: string): void {
+export function safeSet(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {

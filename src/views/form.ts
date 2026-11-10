@@ -5,6 +5,7 @@ import { compressForUpload, loadImage } from '../image';
 import { readReceipt, warmUpOcr } from '../ocr';
 import { enqueue, flush } from '../queue';
 import { getSettings } from '../settings';
+import { guess, learn } from '../storecat';
 
 /** Formulaire d'ajout (initial absent) ou de modification d'une dépense. */
 export function renderForm(
@@ -50,20 +51,36 @@ export function renderForm(
             name: 'category',
             value: c,
             checked: c === categoryValue,
-            onchange: () => (categoryValue = c),
+            onchange: () => {
+              categoryValue = c;
+              guessHint.hidden = true;
+            },
           }),
           h('span', null, c),
         ),
       ),
     );
   }
-  drawChips(api.cachedCategories());
+  let categories = api.cachedCategories();
+  drawChips(categories);
+
+  // Catégorie proposée d'après le magasin, seulement si aucune n'est encore choisie.
+  const guessHint = h('p', { class: 'hint guess', hidden: true }, 'Catégorie proposée d’après le magasin.');
+  function suggestCategory() {
+    if (categoryValue || !store.value.trim()) return;
+    const c = guess(store.value, categories);
+    if (!c) return;
+    categoryValue = c;
+    drawChips(categories);
+    guessHint.hidden = false;
+  }
   const store = h('input', {
     id: 'store',
     type: 'text',
     placeholder: 'Ex. Carrefour',
     value: initial?.store ?? '',
     oninput: () => touched.add('store'),
+    onblur: () => suggestCategory(),
   });
   const note = h('input', { id: 'note', type: 'text', placeholder: 'Optionnel', value: initial?.note ?? '' });
 
@@ -77,7 +94,11 @@ export function renderForm(
   );
 
   // Mise à jour des catégories depuis le Sheet (sans écraser la sélection).
-  api.categories().then(drawChips);
+  api.categories().then((fresh) => {
+    categories = fresh;
+    drawChips(fresh);
+    suggestCategory();
+  });
 
   const preview = h('img', { class: 'preview', alt: 'Ticket', hidden: true });
   const status = h('p', { class: 'ocr-status', hidden: true });
@@ -122,6 +143,7 @@ export function renderForm(
       if (res.store && !touched.has('store') && !store.value) {
         store.value = res.store;
         found.push('magasin');
+        suggestCategory();
       }
       status.textContent = found.length
         ? `Détecté : ${found.join(', ')}. Vérifie avant d'enregistrer.`
@@ -177,6 +199,7 @@ export function renderForm(
           photo,
         };
         submit.disabled = true;
+        learn([expense]);
         try {
           if (editing) {
             const saved = await api.update(expense);
@@ -217,6 +240,7 @@ export function renderForm(
     date,
     h('label', { id: 'category-label' }, 'Catégorie'),
     chips,
+    guessHint,
     secuRow,
     h('label', { for: 'store' }, 'Magasin'),
     store,

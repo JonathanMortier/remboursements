@@ -1,5 +1,6 @@
 import {
   Camera,
+  CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +22,7 @@ import {
 /** Jeu d'icônes SVG unique (Lucide), identique sur iPhone et Android. */
 export const icons = {
   camera: Camera,
+  calendar: CalendarDays,
   check: Check,
   prev: ChevronLeft,
   next: ChevronRight,

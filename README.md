@@ -83,10 +83,21 @@ Le script Google ne sait pas signer des notifications Web Push. L'envoi passe do
 
 Les abonnements sont enregistrés dans l'onglet **Notifications** du Sheet. Ceux qui ont expiré sont supprimés automatiquement.
 
+### Récap de fin de mois
+
+Le 1er de chaque mois vers 9 h, vous recevez tous les deux un récap du mois précédent, par exemple : « Récap d’octobre : 220,61 € à rembourser · 7 dépenses, dont 98,90 € de remboursement attendu ».
+
+Pour l'activer (une seule fois, après avoir mis en place les notifications) :
+1. Colle le nouveau `Code.gs`, puis *Déployer → Gérer les déploiements → ✏️ → Nouvelle version*.
+2. Dans l'éditeur, sélectionne la fonction `installerRecapMensuel` puis **▶ Exécuter**. Accepte la demande d'autorisation (« déclencheurs »).
+3. Pour tester tout de suite, exécute `recapMensuel` : le récap du mois précédent arrive sur vos téléphones.
+
 ## Utilisation
 
 - **Ajouter** : 📷 *Photo du ticket*. Le total, la date et le magasin sont pré-remplis. Vérifie-les, choisis une catégorie, puis enregistre. La première lecture télécharge le moteur OCR (quelques Mo) ; il reste ensuite en cache.
-- **Mois** : affiche le total à rembourser, la répartition par catégorie et la liste des dépenses (avec la photo, et la possibilité de modifier ou de supprimer). Le bouton **Marquer comme remboursé** clôture le mois.
+- **Mois** : affiche le total à rembourser, la répartition par catégorie et la liste des dépenses (avec la photo, et la possibilité de modifier ou de supprimer). Touche une catégorie pour filtrer la liste. Le bouton **Marquer comme remboursé** clôture le mois.
+- **Année** : touche le titre du mois pour voir l'année (total, mois par mois, catégories).
+- **Catégorie proposée** : l'appli retient la catégorie utilisée pour chaque magasin et la pré-sélectionne à la saisie suivante.
 
 Conseils pour la photo : ticket à plat, bien éclairé, cadré au plus près. Le montant détecté peut toujours être corrigé.
 
@@ -94,7 +105,8 @@ Conseils pour la photo : ticket à plat, bien éclairé, cadré au plus près. L
 
 ```bash
 npm install
-npm test          # tests du parsing des tickets et du chiffrement Web Push
+npm test          # tests unitaires (parsing des tickets, catégorie devinée, chiffrement Web Push)
+npm run e2e       # tests de bout en bout (Playwright, téléphone simulé, faux backend) ; 1re fois : npx playwright install chromium
 npm run dev       # appli sur http://localhost:5173
 node scripts/mock-server.mjs   # faux backend : URL http://localhost:8787, code secret « test » (notifications comprises)
 npm run build
@@ -108,4 +120,7 @@ npm run build
 | `src/views/*` | Écrans Ajouter / Mois / Réglages |
 | `apps-script/Code.gs` | Backend Google |
 | `src/push.ts`, `public/push-handler.js` | Abonnement aux notifications, affichage dans le service worker |
+| `src/views/year.ts`, `src/views/stats.ts` | Vue année, barres par catégorie |
+| `src/storecat.ts` | Mémoire magasin → catégorie |
+| `e2e/` | Tests de bout en bout Playwright (lancés par la CI sur chaque push et chaque PR) |
 | `worker/` | Relais Cloudflare d'envoi des notifications (chiffrement + VAPID, sans dépendance) |

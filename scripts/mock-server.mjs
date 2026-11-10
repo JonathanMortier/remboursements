@@ -91,6 +91,28 @@ createServer((req, res) => {
           const sent = await notify([[r.endpoint, s]], { title: 'Notifications activées ✓', body: 'Test depuis le faux backend.', tag: 'test', url: '#/month' });
           return sent ? send({ sent }) : send(null, 'Envoi refusé par le service de notifications');
         }
+        case 'recapTest': {
+          // Récap du mois demandé (ou du mois précédent), comme recapMensuel() du script Google.
+          const d = new Date();
+          const month = r.month ?? new Date(d.getFullYear(), d.getMonth() - 1, 1).toISOString().slice(0, 7);
+          const rows = expenses.filter((x) => x.date.startsWith(month));
+          if (!rows.length) return send({ sent: 0 });
+          const eur = (n) => n.toFixed(2).replace('.', ',') + ' €';
+          const sum = (l) => l.reduce((t, x) => t + x.amount, 0);
+          const unpaid = rows.filter((x) => !x.paidAt);
+          const expected = sum(unpaid.filter((x) => x.secu));
+          const nom = new Date(month + '-01').toLocaleDateString('fr-FR', { month: 'long' });
+          const title = unpaid.length ? `Récap ${/^[aeiou]/.test(nom) ? 'd’' : 'de '}${nom}` : `${nom} est entièrement remboursé ✓`;
+          const body = `${eur(sum(unpaid.length ? unpaid : rows))}${unpaid.length ? ' à rembourser' : ''} · ${rows.length} dépense(s)` +
+            (expected ? `\ndont ${eur(expected)} de remboursement attendu` : '');
+          return send({ sent: await notify([...subs], { title, body, tag: 'recap-' + month, url: '#/month/' + month }) });
+        }
+        case 'reset':
+          // Tests E2E : repart d'un faux backend vide.
+          expenses.length = 0;
+          photos.clear();
+          subs.clear();
+          return send(true);
         case 'photo':
           return send({ mime: 'image/jpeg', base64: photos.get(r.photoId) });
         default:

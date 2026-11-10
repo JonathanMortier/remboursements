@@ -6,6 +6,7 @@ import { applyScriptParam, applyTheme, isConfigured } from './settings';
 import { renderForm } from './views/form';
 import { renderMonth } from './views/month';
 import { renderSettings } from './views/settings';
+import { renderYear } from './views/year';
 import './style.css';
 
 applyTheme();
@@ -33,12 +34,16 @@ function route() {
     location.hash = '#/settings';
     return;
   }
-  Object.entries(tabs).forEach(([k, el]) => el.classList.toggle('active', k === page));
+  const tab = page === 'year' ? 'month' : page;
+  Object.entries(tabs).forEach(([k, el]) => el.classList.toggle('active', k === tab));
   window.scrollTo(0, 0);
 
   switch (page) {
     case 'month':
       renderMonth(main, arg && /^\d{4}-\d{2}$/.test(arg) ? arg : currentMonth());
+      break;
+    case 'year':
+      renderYear(main, arg && /^\d{4}$/.test(arg) ? Number(arg) : Number(currentMonth().slice(0, 4)));
       break;
     case 'settings':
       renderSettings(main);
@@ -52,10 +57,21 @@ window.addEventListener('hashchange', route);
 route();
 
 // Envoi des dépenses en attente : au démarrage, au retour du réseau et au retour dans l'appli.
+// S'il reste des dépenses (réseau revenu mais pas encore utilisable), on réessaie de plus en plus
+// espacé : 2 s, 4 s, 8 s… jusqu'à 1 min.
+let retryTimer: number | undefined;
+let retryDelay = 2000;
 async function sync() {
   if (!isConfigured()) return;
+  clearTimeout(retryTimer);
   const r = await flush();
   if (r.sent) toast(`${r.sent} dépense(s) en attente envoyée(s)`);
+  if (r.remaining && !r.error && navigator.onLine) {
+    retryTimer = window.setTimeout(sync, retryDelay);
+    retryDelay = Math.min(retryDelay * 2, 60_000);
+  } else {
+    retryDelay = 2000;
+  }
 }
 onQueueChange(updateBadge);
 updateBadge();

@@ -375,3 +375,49 @@ function pushTest_(endpoint) {
   if (!r.sent) throw new Error('Envoi refusé par le service de notifications');
   return r;
 }
+
+// --- Récap de fin de mois -------------------------------------------------------
+
+var MOIS_ = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+/** Message de récap pour un mois « AAAA-MM », ou null s'il n'y a aucune dépense. */
+function recapPayload_(month) {
+  var rows = list_(month);
+  if (!rows.length) return null;
+  var nom = MOIS_[Number(month.slice(5, 7)) - 1];
+  var Nom = nom.charAt(0).toUpperCase() + nom.slice(1);
+  var unpaid = rows.filter(function (x) { return !x.paidAt; });
+  var sum = function (list) { return list.reduce(function (s, x) { return s + x.amount; }, 0); };
+  var n = rows.length + ' dépense' + (rows.length > 1 ? 's' : '');
+  var payload = { tag: 'recap-' + month, url: '#/month/' + month };
+  if (!unpaid.length) {
+    payload.title = Nom + ' est entièrement remboursé ✓';
+    payload.body = euro_(sum(rows)) + ' · ' + n;
+  } else {
+    var expected = sum(unpaid.filter(function (x) { return x.secu; }));
+    payload.title = 'Récap ' + (/^[aeiouéèh]/i.test(nom) ? 'd’' : 'de ') + nom;
+    payload.body = euro_(sum(unpaid)) + ' à rembourser · ' + n +
+      (expected > 0 ? '\ndont ' + euro_(expected) + ' de remboursement attendu' : '');
+  }
+  return payload;
+}
+
+/** Déclenché le 1er de chaque mois : récap du mois précédent envoyé à tous les abonnés. */
+function recapMensuel() {
+  var now = new Date();
+  var prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  var month = Utilities.formatDate(prev, Session.getScriptTimeZone(), 'yyyy-MM');
+  var payload = recapPayload_(month);
+  if (!payload) return;
+  var subs = allSubs_();
+  if (subs.length) sendPush_(subs, payload);
+}
+
+/** À lancer une fois à la main : programme recapMensuel le 1er de chaque mois vers 9 h. */
+function installerRecapMensuel() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'recapMensuel') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('recapMensuel').timeBased().onMonthDay(1).atHour(9).create();
+  console.log('Récap mensuel programmé le 1er de chaque mois vers 9 h.');
+}
