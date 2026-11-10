@@ -46,6 +46,42 @@ Pour le deuxième téléphone, utilise le **QR code** affiché dans *Réglages �
 
 Le lien contient l'URL du script mais pas le code secret. Seules les URL `https://script.google.com/macros/…` sont acceptées.
 
+## 4. Notifications (facultatif)
+
+À chaque nouvelle dépense, l'autre utilisateur reçoit une notification : qui, montant, catégorie, magasin, date, note et remboursement attendu. Un appui sur la notification ouvre le mois concerné.
+
+Le script Google ne sait pas signer des notifications Web Push. L'envoi passe donc par un petit relais gratuit sur **Cloudflare Workers** (dossier `worker/`), qui ne stocke rien.
+
+1. **Créer un compte Cloudflare** gratuit sur https://dash.cloudflare.com/sign-up.
+2. **Générer les clés VAPID** (dans le dossier du projet) :
+   ```bash
+   node worker/gen-vapid.mjs
+   ```
+   Garde la sortie sous la main : `VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY`.
+3. **Choisir un mot de passe pour le relais** (`PUSH_SECRET`), par exemple avec `openssl rand -base64 24`.
+4. **Déployer le relais** :
+   ```bash
+   cd worker
+   npx wrangler login
+   npx wrangler deploy
+   npx wrangler secret put PUSH_SECRET
+   npx wrangler secret put VAPID_PUBLIC_KEY
+   npx wrangler secret put VAPID_PRIVATE_KEY
+   npx wrangler secret put VAPID_SUBJECT
+   ```
+   Pour chaque `secret put`, colle la valeur demandée. `VAPID_SUBJECT` est un contact, par exemple `mailto:ton.adresse@gmail.com`. Note l'adresse affichée par `deploy`, du type `https://remboursements-push.<toi>.workers.dev`.
+5. **Script Google** : colle le nouveau `Code.gs`, puis dans *Paramètres du projet → Propriétés du script*, ajoute :
+   - `PUSH_URL` = l'adresse du relais ;
+   - `PUSH_SECRET` = le même mot de passe qu'à l'étape 4 ;
+   - `VAPID_PUBLIC_KEY` = la clé publique.
+
+   Ensuite *Déployer → Gérer les déploiements → ✏️ → Nouvelle version* (l'URL ne change pas). Au premier lancement, Google demande une nouvelle autorisation (« se connecter à un service externe ») : accepte-la.
+6. **Sur chaque téléphone** : *Réglages → Notifications → Activer les notifications*, accepte la demande d'autorisation, puis *Envoyer un test*.
+   - **iPhone** : iOS 16.4 minimum, et l'appli doit être **installée sur l'écran d'accueil** et ouverte depuis son icône.
+   - On ne reçoit pas de notification pour ses propres ajouts.
+
+Les abonnements sont enregistrés dans l'onglet **Notifications** du Sheet. Ceux qui ont expiré sont supprimés automatiquement.
+
 ## Utilisation
 
 - **Ajouter** : 📷 *Photo du ticket*. Le total, la date et le magasin sont pré-remplis. Vérifie-les, choisis une catégorie, puis enregistre. La première lecture télécharge le moteur OCR (quelques Mo) ; il reste ensuite en cache.
@@ -57,9 +93,9 @@ Conseils pour la photo : ticket à plat, bien éclairé, cadré au plus près. L
 
 ```bash
 npm install
-npm test          # tests du parsing des tickets (src/parse.test.ts)
+npm test          # tests du parsing des tickets et du chiffrement Web Push
 npm run dev       # appli sur http://localhost:5173
-node scripts/mock-server.mjs   # faux backend : URL http://localhost:8787, code secret « test »
+node scripts/mock-server.mjs   # faux backend : URL http://localhost:8787, code secret « test » (notifications comprises)
 npm run build
 ```
 
@@ -70,3 +106,5 @@ npm run build
 | `src/api.ts`, `src/queue.ts` | Appels Apps Script, file d'attente hors ligne (IndexedDB) |
 | `src/views/*` | Écrans Ajouter / Mois / Réglages |
 | `apps-script/Code.gs` | Backend Google |
+| `src/push.ts`, `public/push-handler.js` | Abonnement aux notifications, affichage dans le service worker |
+| `worker/` | Relais Cloudflare d'envoi des notifications (chiffrement + VAPID, sans dépendance) |

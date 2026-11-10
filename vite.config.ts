@@ -33,6 +33,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Réception et affichage des notifications push (public/push-handler.js).
+        importScripts: ['push-handler.js'],
         runtimeCaching: [
           {
             // Moteur Tesseract (worker, wasm) et données de langue « fra » chargés depuis jsDelivr.

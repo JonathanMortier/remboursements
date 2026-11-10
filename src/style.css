@@ -162,6 +162,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .steps { margin: 0; padding-left: 20px; }
 .alt { margin-top: 10px; }
 .alt summary { font-size: 0.9rem; color: var(--muted); cursor: pointer; padding: 6px 0; }
+.notif .status-on { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ok); font-weight: 600; }
+.notif .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .banner.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
 
 .password { position: relative; }
@@ -245,6 +247,13 @@ progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .summary .amount { margin: 0; font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .summary .sub { margin: 0 0 8px; color: var(--muted); font-size: 0.9rem; }
 .summary.paid .amount { color: var(--ok); }
+.summary .amount-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; }
+.summary .expected {
+  display: inline-flex; flex-direction: column; align-items: flex-start; line-height: 1.15;
+  padding: 4px 10px; border-radius: 10px; background: var(--accent-soft); color: var(--accent);
+  font-weight: 700; font-size: 0.95rem; font-variant-numeric: tabular-nums;
+}
+.summary .expected small { font-weight: 500; font-size: 0.75rem; }
 
 .cats { display: flex; flex-direction: column; gap: 8px; }
 .cat { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; font-size: 0.95rem; }

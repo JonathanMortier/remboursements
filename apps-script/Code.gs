@@ -8,6 +8,8 @@
  *        - Exécuter en tant que : Moi
  *        - Qui a accès : Tout le monde
  *      Copier l'URL (…/exec) dans les réglages de l'appli.
+ *
+ * Notifications (facultatif, voir README) : propriétés PUSH_URL, PUSH_SECRET et VAPID_PUBLIC_KEY.
  */
 
 var SHEET_EXPENSES = 'Dépenses';
@@ -16,6 +18,8 @@ var HEADERS = ['id', 'date', 'montant', 'catégorie', 'magasin', 'note', 'photo_
 var COL = { id: 0, date: 1, amount: 2, category: 3, store: 4, note: 5, photoId: 6, by: 7, createdAt: 8, paidAt: 9, secu: 10 };
 var DEFAULT_CATEGORIES = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
 var FOLDER_NAME = 'Tickets remboursements';
+var SHEET_SUBS = 'Notifications';
+var SUBS_HEADERS = ['endpoint', 'prénom', 'abonnement', 'créé_le'];
 
 /** Crée les onglets, les en-têtes et le dossier Drive. À lancer une fois à la main. */
 function setup() {
@@ -73,11 +77,19 @@ function doPost(e) {
     switch (req.action) {
       case 'categories': return json_({ ok: true, data: categories_() });
       case 'list': return json_({ ok: true, data: list_(req.month) });
-      case 'add': return json_({ ok: true, data: withLock_(function () { return add_(req.expense); }) });
+      case 'add': {
+        var added = withLock_(function () { return add_(req.expense); });
+        if (added.isNew) notifyNew_(added.expense);
+        return json_({ ok: true, data: added.expense });
+      }
       case 'update': return json_({ ok: true, data: withLock_(function () { return update_(req.expense); }) });
       case 'delete': return json_({ ok: true, data: withLock_(function () { return delete_(req.id); }) });
       case 'markPaid': return json_({ ok: true, data: withLock_(function () { return markPaid_(req.month, req.paid); }) });
       case 'photo': return json_({ ok: true, data: photo_(req.photoId) });
+      case 'pushConfig': return json_({ ok: true, data: { publicKey: pushConfig_().publicKey } });
+      case 'subscribe': return json_({ ok: true, data: withLock_(function () { return subscribe_(req.subscription, req.name); }) });
+      case 'unsubscribe': return json_({ ok: true, data: withLock_(function () { return unsubscribe_(req.endpoint); }) });
+      case 'pushTest': return json_({ ok: true, data: pushTest_(req.endpoint) });
       default: return json_({ ok: false, error: 'Action inconnue : ' + req.action });
     }
   } catch (err) {
@@ -181,7 +193,7 @@ function savePhoto_(base64, expense) {
 function add_(x) {
   if (!x || !x.id) throw new Error('Dépense invalide');
   var existing = findRow_(x.id);
-  if (existing) return rowToExpense_(existing.row); // envoi en double (file hors ligne) : on ignore
+  if (existing) return { isNew: false, expense: rowToExpense_(existing.row) }; // envoi en double (file hors ligne)
 
   var photoId = x.photo ? savePhoto_(x.photo, x) : '';
   var row = [
@@ -189,7 +201,7 @@ function add_(x) {
     photoId, x.by || '', new Date().toISOString(), '', secuToCell_(x.secu)
   ];
   sheet_().appendRow(row);
-  return rowToExpense_(row);
+  return { isNew: true, expense: rowToExpense_(row) };
 }
 
 function update_(x) {
@@ -237,4 +249,116 @@ function photo_(photoId) {
   if (!photoId) throw new Error('Pas de photo');
   var blob = DriveApp.getFileById(photoId).getBlob();
   return { mime: blob.getContentType(), base64: Utilities.base64Encode(blob.getBytes()) };
+}
+
+// --- Notifications ------------------------------------------------------------
+
+function pushConfig_() {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    url: (props.getProperty('PUSH_URL') || '').trim().replace(/\/+$/, ''),
+    secret: (props.getProperty('PUSH_SECRET') || '').trim(),
+    publicKey: (props.getProperty('VAPID_PUBLIC_KEY') || '').trim()
+  };
+}
+
+function subsSheet_() {
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(SHEET_SUBS);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_SUBS);
+    sh.appendRow(SUBS_HEADERS);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function allSubs_() {
+  var sh = subsSheet_();
+  var n = sh.getLastRow() - 1;
+  if (n <= 0) return [];
+  return sh.getRange(2, 1, n, SUBS_HEADERS.length).getValues().map(function (r, i) {
+    var sub = null;
+    try { sub = JSON.parse(r[2]); } catch (e) { /* ligne abîmée : ignorée */ }
+    return { row: i + 2, endpoint: str_(r[0]), name: str_(r[1]), subscription: sub };
+  }).filter(function (s) { return s.subscription && s.endpoint; });
+}
+
+function subscribe_(sub, name) {
+  if (!sub || !sub.endpoint || !sub.keys || !sub.keys.p256dh || !sub.keys.auth) throw new Error('Abonnement invalide');
+  if (!/^https:\/\//.test(sub.endpoint)) throw new Error('Abonnement invalide');
+  var clean = { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } };
+  var values = [sub.endpoint, String(name || ''), JSON.stringify(clean), new Date().toISOString()];
+  var existing = allSubs_().filter(function (s) { return s.endpoint === sub.endpoint; })[0];
+  var sh = subsSheet_();
+  if (existing) sh.getRange(existing.row, 1, 1, values.length).setValues([values]);
+  else sh.appendRow(values);
+  return true;
+}
+
+function unsubscribe_(endpoint) {
+  var rows = allSubs_().filter(function (s) { return s.endpoint === endpoint; });
+  var sh = subsSheet_();
+  rows.reverse().forEach(function (s) { sh.deleteRow(s.row); });
+  return true;
+}
+
+/** Envoie `payload` aux abonnements via le Worker et supprime ceux qui ont expiré. */
+function sendPush_(subs, payload) {
+  var cfg = pushConfig_();
+  if (!cfg.url || !cfg.secret || !subs.length) return { sent: 0, failed: 0, configured: Boolean(cfg.url && cfg.secret) };
+  var res = UrlFetchApp.fetch(cfg.url + '/send', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + cfg.secret },
+    payload: JSON.stringify({ subscriptions: subs.map(function (s) { return s.subscription; }), payload: payload }),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() !== 200) throw new Error('Service de notifications : erreur ' + res.getResponseCode());
+  var results = JSON.parse(res.getContentText()).results || [];
+  var gone = results.filter(function (r) { return r.status === 404 || r.status === 410; })
+    .map(function (r) { return r.endpoint; });
+  if (gone.length) withLock_(function () { gone.forEach(unsubscribe_); });
+  var ok = results.filter(function (r) { return r.status >= 200 && r.status < 300; }).length;
+  return { sent: ok, failed: results.length - ok, configured: true };
+}
+
+function euro_(n) {
+  return (Math.round(Number(n) * 100) / 100).toFixed(2).replace('.', ',') + ' €';
+}
+
+/** Nouvelle dépense : notifie les autres utilisateurs (pas celui qui l'a saisie). */
+function notifyNew_(x) {
+  try {
+    var subs = allSubs_().filter(function (s) { return s.name !== x.by; });
+    if (!subs.length) return;
+    var d = x.date.split('-');
+    var details = [x.category, x.store, d.length === 3 ? d[2] + '/' + d[1] : x.date].filter(String);
+    var lines = [details.join(' · ')];
+    if (x.secu) lines.push('Remboursement attendu');
+    if (x.note) lines.push(x.note);
+    sendPush_(subs, {
+      title: (x.by || 'Quelqu\u2019un') + ' a ajouté ' + euro_(x.amount),
+      body: lines.join('\n'),
+      tag: 'expense-' + x.id,
+      url: '#/month/' + x.date.slice(0, 7)
+    });
+  } catch (err) {
+    console.error('Notification non envoyée : ' + err); // l'ajout de la dépense reste valide
+  }
+}
+
+/** Notification de test vers l'appareil qui la demande. */
+function pushTest_(endpoint) {
+  var subs = allSubs_().filter(function (s) { return s.endpoint === endpoint; });
+  if (!subs.length) throw new Error('Cet appareil n\u2019est pas abonné');
+  var r = sendPush_(subs, {
+    title: 'Notifications activées ✓',
+    body: 'Tu seras prévenu à chaque nouvelle dépense de l\u2019autre utilisateur.',
+    tag: 'test',
+    url: '#/month'
+  });
+  if (!r.configured) throw new Error('Notifications non configurées dans le script (PUSH_URL / PUSH_SECRET)');
+  if (!r.sent) throw new Error('Envoi refusé par le service de notifications');
+  return r;
 }

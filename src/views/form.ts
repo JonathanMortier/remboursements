@@ -1,4 +1,4 @@
-import { api, isCare, NetworkError, type Expense, type ExpenseInput } from '../api';
+import { api, NetworkError, type Expense, type ExpenseInput } from '../api';
 import { formatEuro, h, parseAmount, toast, todayIso, uuid } from '../dom';
 import { icon } from '../icons';
 import { compressForUpload, loadImage } from '../image';
@@ -50,10 +50,7 @@ export function renderForm(
             name: 'category',
             value: c,
             checked: c === categoryValue,
-            onchange: () => {
-              categoryValue = c;
-              updateSecu();
-            },
+            onchange: () => (categoryValue = c),
           }),
           h('span', null, c),
         ),
@@ -70,24 +67,17 @@ export function renderForm(
   });
   const note = h('input', { id: 'note', type: 'text', placeholder: 'Optionnel', value: initial?.note ?? '' });
 
-  // Interrupteur « remboursé par la Sécu », visible seulement pour les soins.
+  // Interrupteur « Remboursement attendu » (Sécu, mutuelle…), pour toutes les catégories.
   const secu = h('input', { id: 'secu', type: 'checkbox', role: 'switch', checked: initial?.secu === true });
   const secuRow = h(
     'label',
     { class: 'switch-row field', for: 'secu' },
-    h('span', null, 'Remboursé par la Sécu'),
+    h('span', null, 'Remboursement attendu'),
     secu,
   );
-  function updateSecu() {
-    secuRow.hidden = !isCare(categoryValue);
-  }
-  updateSecu();
 
   // Mise à jour des catégories depuis le Sheet (sans écraser la sélection).
-  api.categories().then((fresh) => {
-    drawChips(fresh);
-    updateSecu();
-  });
+  api.categories().then(drawChips);
 
   const preview = h('img', { class: 'preview', alt: 'Ticket', hidden: true });
   const status = h('p', { class: 'ocr-status', hidden: true });
@@ -183,7 +173,7 @@ export function renderForm(
           store: store.value.trim(),
           note: note.value.trim(),
           by: initial?.by ?? getSettings().name,
-          secu: isCare(categoryValue) ? secu.checked : undefined,
+          secu: secu.checked,
           photo,
         };
         submit.disabled = true;

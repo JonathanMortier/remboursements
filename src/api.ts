@@ -11,7 +11,10 @@ export interface Expense {
   by: string;
   createdAt?: string;
   paidAt?: string;
-  /** Dépense de soin : remboursée (true) ou non (false) par la Sécu. Absent hors soins. */
+  /**
+   * Remboursement attendu par Jonathan (Sécu, mutuelle, autre…) pour cette dépense.
+   * Le champ garde son nom historique « secu » (colonne « sécu » du Sheet) pour rester compatible.
+   */
   secu?: boolean;
 }
 
@@ -22,9 +25,6 @@ export interface ExpenseInput extends Expense {
 
 export const DEFAULT_CATEGORIES = ['Courses', 'Pharma', 'Psy', 'Magasins', 'Divers', 'Transports'];
 
-/** Catégories de soins, pour lesquelles on indique le remboursement Sécu. */
-export const isCare = (category: string) =>
-  /pharma|psy|sant[ée]|soin|m[ée]dec|docteur|dentist|kin[ée]|ortho|optic|lunett|h[ôo]pital|labo/i.test(category);
 
 export class NetworkError extends Error {}
 export class ServerError extends Error {}
@@ -81,4 +81,8 @@ export const api = {
   markPaid: (month: string, paid: boolean) => call<number>('markPaid', { month, paid }),
   photo: (photoId: string) => call<{ mime: string; base64: string }>('photo', { photoId }),
   ping: () => call<string[]>('categories'),
+  pushConfig: () => call<{ publicKey: string }>('pushConfig'),
+  subscribe: (subscription: PushSubscriptionJSON, name: string) => call<boolean>('subscribe', { subscription, name }),
+  unsubscribe: (endpoint: string) => call<boolean>('unsubscribe', { endpoint }),
+  pushTest: (endpoint: string) => call<{ sent: number }>('pushTest', { endpoint }),
 };

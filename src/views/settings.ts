@@ -1,6 +1,7 @@
 import { api } from '../api';
 import { h, toast } from '../dom';
 import { icon } from '../icons';
+import { disablePush, enablePush, pushState, refreshSubscription, testPush, type PushState } from '../push';
 import { flush, pending } from '../queue';
 import {
   exportConfigCode,
@@ -56,6 +57,7 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       await api.ping();
       await api.categories();
       const r = await flush();
+      refreshSubscription().catch(() => {}); // prénom éventuellement modifié
       toast('Connexion OK' + (r.sent ? ` · ${r.sent} dépense(s) envoyée(s)` : ''));
       location.hash = '#/add';
     } catch (err) {
@@ -83,6 +85,7 @@ export async function renderSettings(root: HTMLElement): Promise<void> {
       h('button', { type: 'submit', class: 'primary big' }, 'Enregistrer et tester'),
     ),
     themeSection(),
+    notificationsSection(),
     await shareSection(code, url, secret, name),
     queued
       ? h(
@@ -252,4 +255,60 @@ function themeSection(): HTMLElement {
     ),
     h('p', { class: 'hint' }, 'Auto suit le réglage clair / sombre du téléphone.'),
   );
+}
+
+/** Notifications push : activation par appareil, avec test d'envoi. */
+function notificationsSection(): HTMLElement {
+  const body = h('div', { class: 'form' });
+  const section = h('section', { class: 'card form notif' }, h('h2', null, 'Notifications'), body);
+
+  const busy = async (btn: HTMLButtonElement, label: string, fn: () => Promise<void>, ok: string) => {
+    const old = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = label;
+    try {
+      await fn();
+      if (ok) toast(ok);
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+      draw();
+    }
+  };
+
+  const messages: Record<Exclude<PushState, 'on' | 'off'>, string> = {
+    unsupported: 'Les notifications ne sont pas disponibles ici. Ouvre l’appli installée sur ton téléphone.',
+    install:
+      'Sur iPhone, installe d’abord l’appli : Safari → Partager → Sur l’écran d’accueil, puis ouvre-la depuis son icône (iOS 16.4 ou plus récent).',
+    denied:
+      'Les notifications sont bloquées. Autorise-les dans les réglages du téléphone (Notifications → Remboursements), puis reviens ici.',
+  };
+
+  async function draw() {
+    const state = await pushState();
+    if (state === 'on') {
+      const test = h('button', { type: 'button' }, 'Envoyer un test');
+      const off = h('button', { type: 'button', class: 'danger' }, 'Désactiver');
+      test.onclick = () => busy(test, 'Envoi…', testPush, 'Notification de test envoyée');
+      off.onclick = () => busy(off, 'Désactivation…', disablePush, 'Notifications désactivées');
+      body.replaceChildren(
+        h('p', { class: 'status-on' }, icon('check', 18), 'Activées sur ce téléphone'),
+        h('p', { class: 'hint' }, 'Tu es prévenu dès que l’autre utilisateur ajoute une dépense.'),
+        h('div', { class: 'row-actions' }, test, off),
+      );
+    } else if (state === 'off') {
+      const on = h('button', { type: 'button', class: 'primary' }, 'Activer les notifications');
+      on.onclick = () => busy(on, 'Activation…', enablePush, 'Notifications activées');
+      body.replaceChildren(
+        h('p', { class: 'hint' }, 'Reçois une notification (qui, montant, catégorie…) dès que l’autre utilisateur ajoute une dépense.'),
+        on,
+      );
+    } else {
+      body.replaceChildren(h('p', { class: 'hint' }, messages[state]));
+    }
+  }
+  draw();
+  return section;
 }

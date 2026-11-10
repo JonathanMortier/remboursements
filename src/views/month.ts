@@ -40,6 +40,8 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
     const unpaid = rows.filter((x) => !x.paidAt).reduce((s, x) => s + x.amount, 0);
     const allPaid = rows.length > 0 && rows.every((x) => x.paidAt);
     const paidDate = allPaid ? rows.map((x) => x.paidAt!).sort().pop()!.slice(0, 10) : '';
+    // Part du montant affiché pour laquelle un remboursement est attendu (Sécu, mutuelle…).
+    const expected = rows.filter((x) => x.secu && (allPaid || !x.paidAt)).reduce((s, x) => s + x.amount, 0);
 
     const byCat = new Map<string, number>();
     for (const x of rows) byCat.set(x.category, (byCat.get(x.category) ?? 0) + x.amount);
@@ -49,7 +51,19 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
       { class: 'card summary' + (allPaid ? ' paid' : '') },
       refresh,
       h('p', { class: 'label' }, allPaid ? 'Remboursé' : 'À rembourser'),
-      h('p', { class: 'amount' }, formatEuro(allPaid ? total : unpaid)),
+      h(
+        'div',
+        { class: 'amount-row' },
+        h('p', { class: 'amount' }, formatEuro(allPaid ? total : unpaid)),
+        expected > 0
+          ? h(
+              'span',
+              { class: 'expected', title: 'Remboursement attendu sur ce montant' },
+              h('small', null, 'dont attendu'),
+              formatEuro(expected),
+            )
+          : null,
+      ),
       allPaid
         ? h('p', { class: 'sub' }, `le ${dateLabel(paidDate)}`)
         : unpaid !== total
@@ -125,9 +139,7 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
                   'div',
                   { class: 'right' },
                   h('strong', null, formatEuro(x.amount)),
-                  x.secu !== undefined
-                    ? h('span', { class: 'badge ' + (x.secu ? 'secu' : 'muted') }, x.secu ? 'Sécu ✓' : 'Sécu ✗')
-                    : null,
+                  x.secu ? h('span', { class: 'badge secu' }, 'Remb. attendu') : null,
                   x.pending
                     ? h('span', { class: 'badge warn' }, 'en attente')
                     : x.paidAt
@@ -161,7 +173,8 @@ export async function renderMonth(root: HTMLElement, month: string): Promise<voi
         h('dd', null, dateLabel(x.date)),
         h('dt', null, 'Catégorie'),
         h('dd', null, x.category),
-        x.secu !== undefined ? [h('dt', null, 'Sécu'), h('dd', null, x.secu ? 'Remboursé' : 'Non remboursé')] : null,
+        h('dt', null, 'Remb. attendu'),
+        h('dd', null, x.secu ? 'Oui' : 'Non'),
         x.note ? [h('dt', null, 'Note'), h('dd', null, x.note)] : null,
         x.by ? [h('dt', null, 'Saisi par'), h('dd', null, x.by)] : null,
         x.paidAt ? [h('dt', null, 'Remboursé'), h('dd', null, dateLabel(x.paidAt.slice(0, 10)))] : null,
